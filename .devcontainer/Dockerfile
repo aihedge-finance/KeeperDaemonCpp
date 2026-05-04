@@ -18,12 +18,14 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Foundry (anvil + cast + forge) for integration tests.
-# Binaries are copied to /usr/local/bin so they are available to all users.
-RUN curl -L https://foundry.paradigm.xyz | bash \
-    && /root/.foundry/bin/foundryup \
-    && cp /root/.foundry/bin/anvil /usr/local/bin/anvil \
-    && cp /root/.foundry/bin/cast  /usr/local/bin/cast  \
-    && cp /root/.foundry/bin/forge /usr/local/bin/forge
+# Fetch the latest stable release tag, then download that tarball directly
+# into /usr/local/bin — avoids the foundryup home-dir / permission issues.
+RUN FOUNDRY_TAG=$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+        https://github.com/foundry-rs/foundry/releases/latest \
+        | sed 's|.*/tag/||') \
+    && curl -fL "https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_TAG}/foundry_${FOUNDRY_TAG}_linux_amd64.tar.gz" \
+    | tar -xz -C /usr/local/bin anvil cast forge
+
 
 # Pre-detect Conan profile so first `make deps` is faster
 RUN conan profile detect --force

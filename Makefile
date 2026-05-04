@@ -1,6 +1,11 @@
 # Curve Keeper Daemon — Makefile
 # All targets are designed to run inside the Dev Container.
 
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
+
 .PHONY: help deps build clean lint test-unit test-integration smoke
 
 help: ## Show available targets
