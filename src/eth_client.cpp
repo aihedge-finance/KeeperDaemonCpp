@@ -25,11 +25,11 @@ using tcp       = net::ip::tcp;
 // ── URL parser ───────────────────────────────────────────────────────────────
 
 EthClient::EthClient(const std::string& rpc_url) {
-    // Expected format: https://host[:port]/path
+    // Expected format: https://host[:port]/path  OR  http://host[:port]/path
     std::string url = rpc_url;
-    bool is_https = (url.substr(0, 8) == "https://");
-    std::string scheme = is_https ? "https://" : "http://";
-    port_ = is_https ? "443" : "80";
+    is_https_ = (url.substr(0, 8) == "https://");
+    std::string scheme = is_https_ ? "https://" : "http://";
+    port_ = is_https_ ? "443" : "80";
 
     url = url.substr(scheme.size());
     auto slash = url.find('/');
@@ -45,25 +45,13 @@ EthClient::EthClient(const std::string& rpc_url) {
     }
 }
 
-// ── Core HTTPS POST ──────────────────────────────────────────────────────────
+// ── Core HTTP/HTTPS POST ─────────────────────────────────────────────────────
 
 nlohmann::json EthClient::rpcCall(const std::string& method,
                                    const nlohmann::json& params) {
     net::io_context ioc;
-    ssl::context ctx(ssl::context::tlsv12_client);
-    ctx.set_default_verify_paths();
-    ctx.set_verify_mode(ssl::verify_peer);
-
-    tcp::resolver resolver(ioc);
-    beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
-
-    // SNI — required by most CDN/cloud RPC providers
-    if (!SSL_set_tlsext_host_name(stream.native_handle(), host_.c_str()))
-        throw std::runtime_error("SSL SNI setup failed");
-
-    auto results = resolver.resolve(host_, port_);
-    beast::get_lowest_layer(stream).connect(results);
-    stream.handshake(ssl::stream_base::client);
+    tcp::resolver  resolver(ioc);
+    auto           results = resolver.resolve(host_, port_);
 
     nlohmann::json body = {
         {"jsonrpc", "2.0"},
@@ -72,24 +60,53 @@ nlohmann::json EthClient::rpcCall(const std::string& method,
         {"id",      ++request_id_}
     };
 
-    http::request<http::string_body> req{http::verb::post, path_, 11};
-    req.set(http::field::host,         host_);
-    req.set(http::field::content_type, "application/json");
-    req.set(http::field::user_agent,   "curve-keeper/1.0");
-    req.body() = body.dump();
-    req.prepare_payload();
-
-    http::write(stream, req);
+    auto build_request = [&]() {
+        http::request<http::string_body> req{http::verb::post, path_, 11};
+        req.set(http::field::host,         host_);
+        req.set(http::field::content_type, "application/json");
+        req.set(http::field::user_agent,   "curve-keeper/1.0");
+        req.body() = body.dump();
+        req.prepare_payload();
+        return req;
+    };
 
     beast::flat_buffer buf;
     http::response<http::string_body> res;
-    http::read(stream, buf, res);
 
-    beast::error_code ec;
-    stream.shutdown(ec);
-    // ssl::error::stream_truncated is expected on clean shutdown
-    if (ec && ec != ssl::error::stream_truncated)
-        std::cerr << "[WARN] TLS shutdown: " << ec.message() << "\n";
+    if (is_https_) {
+        // ── HTTPS path (mainnet RPC providers) ───────────────────────────────
+        ssl::context ctx(ssl::context::tlsv12_client);
+        ctx.set_default_verify_paths();
+        ctx.set_verify_mode(ssl::verify_peer);
+
+        beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
+
+        // SNI — required by most CDN/cloud RPC providers
+        if (!SSL_set_tlsext_host_name(stream.native_handle(), host_.c_str()))
+            throw std::runtime_error("SSL SNI setup failed");
+
+        beast::get_lowest_layer(stream).connect(results);
+        stream.handshake(ssl::stream_base::client);
+
+        http::write(stream, build_request());
+        http::read(stream, buf, res);
+
+        beast::error_code ec;
+        stream.shutdown(ec);
+        // ssl::error::stream_truncated is normal on clean TLS shutdown
+        if (ec && ec != ssl::error::stream_truncated)
+            std::cerr << "[WARN] TLS shutdown: " << ec.message() << "\n";
+    } else {
+        // ── HTTP path (local Anvil fork, no TLS) ─────────────────────────────
+        beast::tcp_stream stream(ioc);
+        stream.connect(results);
+
+        http::write(stream, build_request());
+        http::read(stream, buf, res);
+
+        beast::error_code ec;
+        stream.socket().shutdown(tcp::socket::shutdown_both, ec);
+    }
 
     return nlohmann::json::parse(res.body());
 }

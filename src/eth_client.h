@@ -12,9 +12,10 @@ struct TxReceipt {
     std::string tx_hash;
 };
 
-// Boost.Beast HTTPS JSON-RPC client.
+// Boost.Beast HTTP/HTTPS JSON-RPC client.
 // All methods return std::optional; nullopt means RPC/network error.
-// Each call opens a fresh TLS connection — appropriate for a low-frequency keeper.
+// Each call opens a fresh connection — appropriate for a low-frequency keeper.
+// Automatically uses plain TCP for http:// (e.g. local Anvil) and TLS for https://.
 class EthClient {
 public:
     // Parses rpc_url into host/port/path at construction time.
@@ -38,12 +39,13 @@ public:
     std::optional<TxReceipt> getTransactionReceipt(const std::string& tx_hash);
 
 private:
+    bool        is_https_{false};
     std::string host_;
     std::string port_;
     std::string path_;
     int         request_id_{0};
 
-    // Performs a single synchronous HTTPS POST, returns parsed JSON body.
+    // Performs a single synchronous HTTP or HTTPS POST, returns parsed JSON body.
     // Throws std::runtime_error on network/HTTP error.
     nlohmann::json rpcCall(const std::string& method,
                             const nlohmann::json& params);
