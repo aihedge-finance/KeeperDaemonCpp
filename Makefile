@@ -30,6 +30,7 @@ clean: ## Remove all build artifacts
 
 lint: ## Run cppcheck static analysis on src/ and tests/
 	cppcheck --enable=all --std=c++20 \
+	    -I src/ \
 	    --suppress=missingIncludeSystem \
 	    --error-exitcode=1 \
 	    src/ tests/unit/

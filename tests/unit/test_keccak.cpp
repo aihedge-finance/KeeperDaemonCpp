@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include "tx_signer.h"
 
+#include <algorithm>
 #include <array>
 #include <iomanip>
 #include <sstream>
@@ -41,7 +42,6 @@ TEST_CASE("keccak256 of long string crosses block boundary", "[keccak]") {
     std::string s(136, 'x');
     auto hash = keccak256(reinterpret_cast<const uint8_t*>(s.data()), s.size());
     // Just verify it doesn't crash and returns a non-zero hash
-    bool nonzero = false;
-    for (auto b : hash) if (b != 0) { nonzero = true; break; }
+    bool nonzero = std::any_of(hash.begin(), hash.end(), [](uint8_t b) { return b != 0; });
     CHECK(nonzero);
 }
