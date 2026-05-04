@@ -53,6 +53,37 @@ echo "=== Running keeper (1 cycle, 30s timeout) ==="
 echo "Strategy:   ${STRATEGY}"
 echo "Keeper key: ${ANVIL_KEEPER_KEY:0:12}... (Anvil account #0)"
 
+# ── Grant keeper role via impersonation ───────────────────────────────────────
+# The strategy's management address controls who can call report().
+# We impersonate management to whitelist Anvil account #0 as a keeper.
+ANVIL_KEEPER_ADDR="0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266"
+
+echo ""
+echo "=== Granting keeper role to ${ANVIL_KEEPER_ADDR} ==="
+
+# Look up the strategy's management address on-chain.
+MANAGEMENT=$(cast call "${STRATEGY}" "management()(address)" \
+    --rpc-url "${TEST_RPC}" 2>/dev/null || echo "")
+
+if [ -n "${MANAGEMENT}" ] && [ "${MANAGEMENT}" != "0x0000000000000000000000000000000000000000" ]; then
+    echo "Strategy management: ${MANAGEMENT}"
+    # Fund management so Anvil can run its tx, then impersonate + call setKeeper.
+    cast rpc anvil_setBalance "${MANAGEMENT}" 0xde0b6b3a7640000 \
+        --rpc-url "${TEST_RPC}" > /dev/null
+    cast rpc anvil_impersonateAccount "${MANAGEMENT}" \
+        --rpc-url "${TEST_RPC}" > /dev/null
+    cast send "${STRATEGY}" "setKeeper(address)" "${ANVIL_KEEPER_ADDR}" \
+        --from "${MANAGEMENT}" \
+        --unlocked \
+        --rpc-url "${TEST_RPC}" > /dev/null \
+        && echo "✅ Keeper whitelisted" \
+        || echo "⚠️  setKeeper failed — strategy may use a different auth model"
+    cast rpc anvil_stopImpersonatingAccount "${MANAGEMENT}" \
+        --rpc-url "${TEST_RPC}" > /dev/null
+else
+    echo "⚠️  Could not read management() — skipping keeper whitelist step"
+fi
+
 rm -f "${STATE_FILE}"
 
 # HARVEST_INTERVAL_SECONDS=999999 means it won't start a second cycle.
