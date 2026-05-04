@@ -47,6 +47,9 @@ logs/
 *.sublime-project
 *.sublime-workspace
 
+# Tools
+.cache/
+
 # OS
 .DS_Store
 Thumbs.db

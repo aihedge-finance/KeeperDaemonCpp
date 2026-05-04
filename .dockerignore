@@ -11,6 +11,7 @@ conan.lock
 .devcontainer/
 .vscode/
 .idea/
+.cache/
 
 # Local configuration & state
 .env
