@@ -1,0 +1,24 @@
+# Build artifacts
+build/
+
+# Conan local cache
+.conan/
+conan_provider.cmake
+
+# Runtime state (ephemeral, do not commit)
+state.json
+state.json.tmp
+logs/
+
+# Secrets — never commit
+.env
+
+# Editor
+.vscode/settings.json
+.vscode/*.json
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

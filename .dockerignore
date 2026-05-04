@@ -1,0 +1,10 @@
+build/
+.git/
+.devcontainer/
+logs/
+state.json
+state.json.tmp
+.env
+*.md
+.gitignore
+.conan/
