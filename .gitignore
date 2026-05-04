@@ -1,9 +1,31 @@
 # Build artifacts
 build/
+bin/
+lib/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.exe
+*.out
+*.app
+*.dSYM/
+
+# CMake
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
 
 # Conan local cache
 .conan/
 conan_provider.cmake
+conan.lock
 
 # Runtime state (ephemeral, do not commit)
 state.json
@@ -12,13 +34,20 @@ logs/
 
 # Secrets — never commit
 .env
+.env.local
+.env.*.local
+*.key
+*.pem
 
 # Editor
-.vscode/settings.json
-.vscode/*.json
+.vscode/
+.idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini

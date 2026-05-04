@@ -1,10 +1,30 @@
+# Build & dependencies
 build/
+.conan/
+conan.lock
+
+# Git
 .git/
+.gitignore
+
+# Dev environments
 .devcontainer/
+.vscode/
+.idea/
+
+# Local configuration & state
+.env
+.env.*
 logs/
 state.json
 state.json.tmp
-.env
+CMakeUserPresets.json
+
+# Documentation & scripts
 *.md
-.gitignore
-.conan/
+Makefile
+tests/
+
+# OS junk
+.DS_Store
+Thumbs.db
