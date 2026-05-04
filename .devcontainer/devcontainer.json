@@ -2,6 +2,9 @@
   // Name shown in the VS Code UI bottom-left corner.
   "name": "Curve Keeper Daemon (C++20)",
 
+  "workspaceFolder": "/workspaces/keeperdaemoncpp",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/keeperdaemoncpp,type=bind,consistency=cached",
+
   "build": {
     "dockerfile": "Dockerfile",
     // ".." lets the Dockerfile COPY from the repo root.
@@ -12,7 +15,10 @@
   "runArgs": [
     "--cap-add=SYS_PTRACE",
     "--security-opt",
-    "seccomp=unconfined"
+    "seccomp=unconfined",
+    // Lets the container use the host's inter-process communication namespace, 
+    // helpful for shared memory performance or specific multi-process scenarios.
+    "--ipc=host"
   ],
 
   "customizations": {
