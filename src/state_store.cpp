@@ -16,6 +16,7 @@ using json   = nlohmann::json;
 static std::string statusToString(StrategyStatus s) {
     switch (s) {
         case StrategyStatus::OK:        return "OK";
+        case StrategyStatus::SKIPPED:   return "SKIPPED";
         case StrategyStatus::COOLDOWN:  return "COOLDOWN";
         case StrategyStatus::SUSPENDED: return "SUSPENDED";
     }
@@ -23,6 +24,7 @@ static std::string statusToString(StrategyStatus s) {
 }
 
 static StrategyStatus statusFromString(const std::string& s) {
+    if (s == "SKIPPED")   return StrategyStatus::SKIPPED;
     if (s == "COOLDOWN")  return StrategyStatus::COOLDOWN;
     if (s == "SUSPENDED") return StrategyStatus::SUSPENDED;
     return StrategyStatus::OK;

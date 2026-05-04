@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-enum class StrategyStatus { OK, COOLDOWN, SUSPENDED };
+enum class StrategyStatus { OK, SKIPPED, COOLDOWN, SUSPENDED };
 
 struct StrategyState {
     std::string    address;

@@ -113,8 +113,13 @@ void Keeper::harvestStrategy(StrategyState& state, uint64_t base_fee_wei) {
     // 1. Estimate gas (skip on revert — not a retry-eligible failure)
     auto gas_est = client_.estimateGas(signer_.getAddress(), state.address, data_hex);
     if (!gas_est) {
+        // report() reverted — strategy is not harvestable right now (no profit, or
+        // protocol-level condition not met). This is NOT a retryable failure; record
+        // SKIPPED so the state file is always written and callers can observe it.
         log("WARN", "Gas estimate failed for " + state.address +
-            " — skipping (possible revert). No retry scheduled.");
+            " — not harvestable this cycle (report() reverted). Marking SKIPPED.");
+        state.status = StrategyStatus::SKIPPED;
+        store_.save("state.json", states_);
         return;
     }
     uint64_t gas_limit = (*gas_est * 12) / 10; // +20% buffer
