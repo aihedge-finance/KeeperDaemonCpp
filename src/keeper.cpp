@@ -1,10 +1,12 @@
 #include "keeper.h"
+#include "harvest_math.h"
 
 #include <chrono>
 #include <ctime>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <thread>
 
 std::atomic<bool> g_shutdown{false};
@@ -95,10 +97,92 @@ void Keeper::runHarvestCycle() {
             log("INFO", "[COOLDOWN] " + state.address + " — cooldown expired, retrying.");
         }
 
+        // ── Pre-harvest profitability check ───────────────────────────────────────
+        HarvestCheck chk = shouldHarvest(state.address, base_fee_wei);
+        log("INFO", "[CHECK] " + state.address + " — " + chk.reason);
+
+        if (!chk.should_harvest) {
+            // Not ready yet — mark SKIPPED so the state file reflects it,
+            // but do NOT apply retry policy (this is not a failure).
+            state.status = StrategyStatus::SKIPPED;
+            store_.save("state.json", states_);
+            continue;
+        }
+
         harvestStrategy(state, base_fee_wei);
     }
 
     log("INFO", "=== Harvest cycle end ===");
+}
+
+// ── Pre-harvest check ──────────────────────────────────────────────────────────────
+
+// Yearn V3 TokenizedStrategy view selectors (standard, same on all chains):
+//   totalAssets() → bytes4 keccak256("totalAssets()")      = 0x01e1d114
+//   totalDebt()   → bytes4 keccak256("totalDebt()")        = 0x890ba44c
+// Both return a single ABI-encoded uint256 (32 bytes, big-endian).
+//
+// The profitability arithmetic lives in harvest_math.h (pure, testable).
+// This function is responsible only for the RPC calls + bridging to HarvestCheck.
+
+HarvestCheck Keeper::shouldHarvest(const std::string& strategy_addr,
+                                    uint64_t           base_fee_wei) {
+    HarvestCheck chk;
+
+    // ── 1. Read totalAssets() ────────────────────────────────────────────────────
+    auto ta_hex = client_.ethCall(strategy_addr, "0x01e1d114");
+    if (!ta_hex) {
+        chk.reason = "eth_call totalAssets() failed — skipping";
+        return chk;
+    }
+    chk.total_assets = decodeUint256(*ta_hex);
+
+    // ── 2. Read totalDebt() ─────────────────────────────────────────────────────
+    auto td_hex = client_.ethCall(strategy_addr, "0x890ba44c");
+    if (!td_hex) {
+        chk.reason = "eth_call totalDebt() failed — skipping";
+        return chk;
+    }
+    chk.total_debt = decodeUint256(*td_hex);
+
+    // ── 3. Estimate gas for report() ────────────────────────────────────────────
+    //    (skip when guard disabled — no need to waste an RPC call)
+    uint64_t gas_estimate = 0;
+    if (cfg_.min_profit_ratio_bps > 0) {
+        const std::string report_selector = "0x51cff8d9";
+        auto gas_opt = client_.estimateGas(
+            signer_.getAddress(), strategy_addr, report_selector);
+        if (!gas_opt) {
+            // estimateGas reverts when report() would revert (e.g. health-check
+            // blocks harvest). Treat this as not-harvestable, not an error.
+            chk.reason = "estimateGas(report()) reverted — strategy not harvestable";
+            return chk;
+        }
+        gas_estimate      = *gas_opt;
+        chk.gas_estimate  = gas_estimate;
+        uint64_t prio_wei = cfg_.max_priority_fee_gwei * 1'000'000'000ULL;
+        chk.gas_cost_wei  = gas_estimate * (base_fee_wei + prio_wei);
+    }
+
+    // ── 4. Delegate pure arithmetic to harvest_math.h ──────────────────────────
+    uint64_t priority_fee_wei = cfg_.max_priority_fee_gwei * 1'000'000'000ULL;
+    auto dec = computeHarvestDecision(
+        chk.total_assets,
+        chk.total_debt,
+        gas_estimate,
+        base_fee_wei,
+        priority_fee_wei,
+        cfg_.eth_usd_price_cents,
+        cfg_.min_profit_ratio_bps);
+
+    chk.profit_raw     = (chk.total_assets > chk.total_debt)
+                         ? chk.total_assets - chk.total_debt : 0;
+    chk.should_harvest = dec.profitable;
+    chk.reason         = dec.reason
+        + " | profit=$" + std::to_string(dec.profit_usd_cents / 100)
+        + " gas=$"      + std::to_string(dec.gas_cost_usd_cents / 100)
+        + " limit_bps=" + std::to_string(cfg_.min_profit_ratio_bps);
+    return chk;
 }
 
 // ── Per-strategy harvest ──────────────────────────────────────────────────────

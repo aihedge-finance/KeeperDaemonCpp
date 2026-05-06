@@ -38,6 +38,11 @@ public:
     // eth_getTransactionReceipt — nullopt if not mined yet.
     std::optional<TxReceipt> getTransactionReceipt(const std::string& tx_hash);
 
+    // eth_call — generic view-function call. Returns the raw 0x-prefixed hex
+    // result string or nullopt on error/revert.
+    // `data` must be the full ABI-encoded calldata including 4-byte selector.
+    std::optional<std::string> ethCall(const std::string& to, const std::string& data);
+
 private:
     bool        is_https_{false};
     std::string host_;

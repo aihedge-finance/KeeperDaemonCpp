@@ -75,6 +75,9 @@ Config Config::fromEnv() {
     cfg.retry_cooldown_seconds   = optEnvUint64("RETRY_COOLDOWN_SECONDS",   21600);
     cfg.max_cooldown_cycles      = optEnvUint32("MAX_COOLDOWN_CYCLES",      4);
 
+    cfg.min_profit_ratio_bps = optEnvUint64("MIN_PROFIT_RATIO_BPS", 500);
+    cfg.eth_usd_price_cents  = optEnvUint64("ETH_USD_PRICE_CENTS",  300000);
+
     // Validate private key format
     if (cfg.keeper_private_key.size() != 66 ||
         cfg.keeper_private_key.substr(0, 2) != "0x")

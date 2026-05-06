@@ -68,6 +68,7 @@ add_executable(run_tests
     tests/unit/test_tx_signer.cpp
     tests/unit/test_state_store.cpp
     tests/unit/test_config.cpp
+    tests/unit/test_harvest_check.cpp
     ${CORE_SOURCES}
 )
 target_compile_options(run_tests PRIVATE -Wall -Wextra -O2)

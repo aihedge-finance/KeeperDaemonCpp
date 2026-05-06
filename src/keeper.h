@@ -8,10 +8,22 @@
 #include <atomic>
 #include <chrono>
 #include <optional>
+#include <string>
 #include <vector>
 
 // Atomic flag — set by signal handler to trigger graceful shutdown.
 extern std::atomic<bool> g_shutdown;
+
+// Result of the pre-harvest profitability check.
+struct HarvestCheck {
+    bool     should_harvest = false;
+    uint64_t total_assets   = 0;  // raw on-chain value (asset decimals)
+    uint64_t total_debt     = 0;  // raw on-chain value (asset decimals)
+    uint64_t profit_raw     = 0;  // total_assets - total_debt (asset decimals)
+    uint64_t gas_estimate   = 0;  // gas units for report()
+    uint64_t gas_cost_wei   = 0;  // gas_estimate * (baseFee + priorityFee)
+    std::string reason;           // human-readable verdict for logging
+};
 
 class Keeper {
 public:
@@ -36,6 +48,13 @@ private:
 
     // Harvest a single strategy; updates state and saves on completion.
     void harvestStrategy(StrategyState& state, uint64_t base_fee_wei);
+
+    // ── Pre-harvest check ────────────────────────────────────────────────────
+    // Reads totalAssets() and totalDebt() from the strategy via eth_call,
+    // then compares estimated gas cost (in USD) against the expected profit.
+    // Works generically for any Yearn V3 TokenizedStrategy.
+    HarvestCheck shouldHarvest(const std::string& strategy_addr,
+                               uint64_t           base_fee_wei);
 
     // ── Retry policy ─────────────────────────────────────────────────────────
     // Increments failure count, transitions to COOLDOWN or SUSPENDED.

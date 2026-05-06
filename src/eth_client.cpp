@@ -195,3 +195,22 @@ std::optional<TxReceipt> EthClient::getTransactionReceipt(const std::string& tx_
         return std::nullopt;
     }
 }
+
+std::optional<std::string> EthClient::ethCall(const std::string& to,
+                                               const std::string& data) {
+    try {
+        auto resp = rpcCall("eth_call",
+                            nlohmann::json::array({
+                                {{"to", to}, {"data", data}},
+                                "latest"
+                            }));
+        if (resp.contains("error") || resp["result"].is_null()) {
+            std::cerr << "[WARN] eth_call error: " << resp.dump() << "\n";
+            return std::nullopt;
+        }
+        return resp["result"].get<std::string>();
+    } catch (const std::exception& e) {
+        std::cerr << "[WARN] ethCall exception: " << e.what() << "\n";
+        return std::nullopt;
+    }
+}

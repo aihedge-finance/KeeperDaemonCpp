@@ -33,6 +33,18 @@ struct Config {
     uint64_t retry_cooldown_seconds = 21600;
     uint32_t max_cooldown_cycles    = 4;
 
+    // ── Harvest profitability guard ───────────────────────────────────────────
+    // Only harvest when estimated gas cost is less than this fraction of the
+    // expected profit. 500 = 5% (i.e. profit must be at least 20x gas cost).
+    // Set to 0 to disable the profitability check and always harvest.
+    uint64_t min_profit_ratio_bps = 500;
+
+    // ETH price in USD cents used to convert gas cost (in ETH) to USD so it
+    // can be compared against on-chain profit (in asset USD terms).
+    // Example: 300000 = $3000.00 per ETH.
+    // This is intentionally a simple config value — update it periodically.
+    uint64_t eth_usd_price_cents = 300000;
+
     // Parses all env vars; throws std::runtime_error on missing required vars.
     static Config fromEnv();
 };
